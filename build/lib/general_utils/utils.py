@@ -1,5 +1,12 @@
 import logging
 from importlib import reload # https://stackoverflow.com/a/53553516
+import pika
+from minio import Minio
+import redis
+import pyarrow as pa
+
+import pandas as pd
+import json
 
 
 
@@ -21,3 +28,185 @@ def logger(logging):
     console.setLevel(logging.INFO)
     console.setFormatter(logging.Formatter('%(levelname)s: %(asctime)s %(process)d %(message)s'))
     logging.getLogger().addHandler(console)
+
+
+
+
+class RMQ:
+    """
+    Used for interacting wiht RabbitMQ.
+    Args:
+        host (str): host for connection
+        port (int): port as int
+        user (str): user_name
+        pwd (str): password
+    Returns:
+        None
+    Methods:
+        listen() : for consuming messages
+        publish() : for sending mesages
+    """
+    def __init__(self, host, port, user, pwd):
+        self.channel = self.set_connection(host, port, user, pwd)
+        self.cust_prop = pika.BasicProperties(
+            delivery_mode=2,  # make message persistent
+        )
+
+    def set_connection(self, host, port, user, pwd):
+        credentials = pika.PlainCredentials(user, pwd)
+        parameters = pika.ConnectionParameters(host,
+                                               port,
+                                               '/',
+                                               credentials)
+        connection = pika.BlockingConnection(parameters)
+        
+        logging.info('--- Connection build successfully ---')
+
+        return connection.channel()
+
+    def callback(self, ch, method, properties, body):
+        logging.info(" Message recieved : {}".format(body))
+        redisId_dict = self.callback_func(body)
+        if redisId_dict and self.publish_fl and self.publish_queue:
+            self.publish(redisId_dict, self.publish_queue)
+        logging.info(" Done Processing")
+        logging.info(" XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX \n\n")
+
+
+    def listen(self, consume_queue, callback_func, publish_fl=False, publish_queue=""):
+        """
+        Used for listening to messages (continuous).
+        Args:
+            consume_queue (str): queue_name to listen
+            callback_func (function): pass a funtion which takes a str as input(the message recieved)
+            publish_fl (bool)[default:True]: 'True', if some message to publish after callback_func()
+            publish_queue (str)[default:""]: queue_name to publish
+        Returns:
+            None [continuously waits for messages, never terminate]
+        """
+        self.callback_func = callback_func
+        self.publish_fl = publish_fl
+        self.publish_queue = publish_queue
+        self.channel.basic_consume(queue=consume_queue,
+                                   auto_ack=True,
+                                   on_message_callback=self.callback)
+        logging.info(' Waiting for messages...')
+        self.channel.start_consuming()
+
+    def publish(self, msg_dict, publish_queue):
+        """
+        Used for publishing messages.
+        Args:
+            msg_dict (dict): message to publish (dict)
+            publish_queue (str): queue_name to publish
+        Returns:
+            None
+        """
+        self.channel.basic_publish(exchange='',
+                                   routing_key=publish_queue,
+                                   properties=self.cust_prop,
+                                   body=json.dumps(msg_dict))
+        logging.info(" Redis keys send to solver for optimization!!!")
+
+
+class REDIS:
+    """
+    Used for interacting wiht Redis.
+    Args:
+        host (str): host for connection
+        port (int): port as int
+    Returns:
+        None
+    Methods:
+        get_data() : for fetching data corresponding to a redis-key
+        set_data() : for insert data corresponding to a redis-key
+    """
+
+    def __init__(self, host, port):
+        self.context = pa.default_serialization_context()
+        self.redis_conn = self.set_connection(host, port)
+
+    def set_connection(self, host, port):
+        return redis.Redis(
+            host=host,
+            port=port)
+
+    def get_data(self, redis_key, data_type="dict"):
+        """
+        Used for fetching data from Redis corresponding to a specific key.
+        Args:
+            redis_key (str): uniquu redis-key
+            data_type (str)[default:'dict']: type of data stored with the redis-key (options:dict, df) 
+        Returns:
+            Data (df/dict)
+        """
+        if data_type == "df":
+            return self.context.deserialize(self.redis_conn.get("{}".format(redis_key)))
+        elif data_type == "dict":
+            return json.loads(self.redis_conn.get("{}".format(redis_key)))
+        else:
+            logging.error(" Wrong data_type requested: data_type='df'/'dict'")
+            return {}
+
+    def set_data(self, redis_key, data, data_type="dict"):
+        """
+        Used for inserting data to Redis corresponding to a specific key.
+        Args:
+            redis_key (str): uniquu redis-key
+            redis_key (str): uniquu redis-key
+            data_type (str)[default:'dict']: type of data stored with the redis-key (options:dict, df) 
+        Returns:
+            Data (df/dict)
+        """
+        if data_type == "df":
+            return self.redis_conn.set("{}".format(redis_key), self.context.serialize(data).to_buffer().to_pybytes())
+        elif data_type == "dict":
+            return self.redis_conn.set("{}".format(redis_key), json.dumps(data))
+        else:
+            logging.error(" Wrong data_type requested: data_type='df'/'dict'")
+            return False
+
+
+class FileStorage:
+    """
+    Used for interacting wiht Redis.
+    Args:
+        host (str): url for connection
+        user (str): user name
+        pwd (str): password
+    Returns:
+        None
+    Methods:
+        get_data() : for fetching data corresponding to a redis-key
+    """
+    def __init__(self, url, user, pwd):
+        self.minioClient = self.set_connection(url, user, pwd)
+
+    def set_connection(self, url, user, pwd):
+        minioClient = Minio(url,
+                            access_key=user,
+                            secret_key=pwd,
+                            secure=False)
+
+        return minioClient
+
+    def get_data(self, bucket_name, file_name, data_type="csv"):
+        """
+        Used for fetching a file from MinIO from a specific bucket.
+        Args:
+            bucket_name (str): MinIO bucket name
+            file_name (str): unique file name 
+            data_type (str)[default:'csv']: type of data to read
+        Returns:
+            Data (df/dict)
+        """
+        data = self.minioClient.get_object(bucket_name, file_name)
+
+        if data_type == "csv":
+            return pd.read_csv(data)
+        else:
+            logging.error(" Wrong data_type requested: data_type='csv'")
+            return {}
+
+
+

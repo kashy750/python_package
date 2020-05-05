@@ -1,14 +1,18 @@
 Metadata-Version: 2.1
 Name: general-utils
-Version: 0.0.1
+Version: 0.0.4
 Summary: A general package that has many functionalities
 Home-page: https://github.com/your_package/homepage/
 Author: Kashyap
-Author-email: kashyap@gmail.com
+Author-email: kashyapmadariyil@gmail.com
 License: UNKNOWN
 Description: # python_package
         
-        This is just a test for building package
+        Includes:
+        1. Logger Module
+        2. Redis Client
+        3. RabbitMQ Client
+        4. MinIo Client
 Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3.7
 Classifier: License :: OSI Approved :: GNU General Public License v3 (GPLv3)

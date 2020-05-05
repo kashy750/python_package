@@ -7,7 +7,7 @@ requirements = []
 
 setup(
     name="general_utils",
-    version="0.0.1",
+    version="0.0.4",
     author="Kashyap",
     author_email="kashyapmadariyil@gmail.com",
     description="A general package that has many functionalities",

@@ -9,7 +9,7 @@ setup(
     name="general_utils",
     version="0.0.1",
     author="Kashyap",
-    author_email="kashyap@gmail.com",
+    author_email="kashyapmadariyil@gmail.com",
     description="A general package that has many functionalities",
     long_description=readme,
     long_description_content_type="text/markdown",

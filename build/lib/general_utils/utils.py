@@ -10,11 +10,11 @@ import json
 
 
 
-def logger(logging):
+def logger():
     """
     Used for logging in cmd line.
     Args:
-        my_name (str): person's name
+        None
     Returns:
         None
     """

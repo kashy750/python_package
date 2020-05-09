@@ -7,14 +7,8 @@ Includes:
 4. MinIo Client
 
 
-NAME
-    python_package.general_utils.utils
 
-CLASSES
-    builtins.object
-        FileStorage
-        REDIS
-        RMQ
+CLASSES:
     
     class FileStorage(builtins.object)
      |  FileStorage(url, user, pwd)
@@ -151,10 +145,10 @@ CLASSES
      |  __weakref__
      |      list of weak references to the object (if defined)
 
-FUNCTIONS
-    logger()
-        Used for logging in cmd line.
-        Args:
-            None
-        Returns:
+	FUNCTIONS
+	    logger()
+	        Used for logging in cmd line.
+	        Args:
+	            None
+	        Returns:
             None

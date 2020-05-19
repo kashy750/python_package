@@ -1,9 +1,13 @@
+from gevent import monkey as curious_george
+curious_george.patch_all(thread=False, select=False)
+
 import logging
 from importlib import reload # https://stackoverflow.com/a/53553516
 import pika
 from minio import Minio
 import redis
 import pyarrow as pa
+import grequests, requests
 
 import pandas as pd
 import json
@@ -19,15 +23,12 @@ def logger():
         None
     """
     reload(logging) # https://stackoverflow.com/a/53553516
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(levelname)s: %(asctime)s %(process)d %(message)s',
-                        #datefmt='%d/%m/%Y %I:%M:%S %p',
+    logging.basicConfig(level=logging.INFO,
+                        format='%(levelname)s: %(asctime)s %(process)d %(message)s ',
+                        datefmt='%d/%m/%Y %I:%M:%S %p'
                         # filename=constants.LOG_FILE_LOCATION, filemode='a')
                         )
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    console.setFormatter(logging.Formatter('%(levelname)s: %(asctime)s %(process)d %(message)s'))
-    logging.getLogger().addHandler(console)
+    return logging
 
 
 
@@ -87,6 +88,10 @@ class RMQ:
         self.callback_func = callback_func
         self.publish_fl = publish_fl
         self.publish_queue = publish_queue
+        # try:
+        #     self.channel.queue_declare(queue=consume_queue)
+        # except Exception as e:
+        #     logging.warning(' Queue Declaration error: {}'.format(e))
         self.channel.basic_consume(queue=consume_queue,
                                    auto_ack=True,
                                    on_message_callback=self.callback)
@@ -207,6 +212,97 @@ class FileStorage:
         else:
             logging.error(" Wrong data_type requested: data_type='csv'")
             return {}
+
+
+class APIrequest:
+    """
+    Used for requesting API.
+    Args:
+        None
+    Returns:
+        None
+    Methods:
+        get() : for GET rqst
+        post() : for POST rqst
+        get_multi() : for parallel GET rqst
+        post_multi() : for parallel POST rqst
+    """
+    
+    def __init__(self):
+        self.header_content = {'Content-Type': 'application/json'}
+
+    def post(self, url, body, headers={}, timeout_time=600):
+        """
+        Used for POST request.
+        Args:
+            url (str): url
+            body (dict): data dict  
+            headers (dict)[default:{'Content-Type': 'application/json'}]: if required
+            timeout_time(int)[default:600]: timeout required 
+        Returns:
+            Response object
+        """
+        try:
+            return requests.post(url, json.dumps(body), headers=dict(self.header_content, **headers), verify = False, timeout=timeout_time)
+        except requests.ConnectionError as e:
+            logging.error("   -API POST connection error[{}] ".format(e))
+        except requests.Timeout as e:
+            logging.error("   -API POST timeout error[{}]".format(e))
+
+        return
+
+    def get(self, url, headers={}, timeout_time=600):
+        """
+        Used for GET request.
+        Args:
+            url (str): url
+            headers (dict)[default:{'Content-Type': 'application/json'}]: if required
+            timeout_time(int)[default:600]: timeout required 
+        Returns:
+            Response object
+        """
+        try:
+            return requests.get(url, headers=dict(self.header_content, **headers), verify = False, timeout=timeout_time)
+        except requests.ConnectionError as e:
+            logging.error("   -API POST connection error[{}] ".format(e))
+        except requests.Timeout as e:
+            logging.error("   -API POST timeout error[{}]".format(e))
+
+        return
+
+    def post_multi(self, url, body_list, headers={}, timeout_time=600, pool_size=1):
+        """
+        Used for parallel async POST request.
+        Args:
+            url (str): url
+            body_list (list): list of data dicts  
+            headers (dict)[default:{'Content-Type': 'application/json'}]: if required
+            timeout_time(int)[default:600]: timeout required 
+            pool_size(int)[default:1]: number of parallel requests fired
+        Returns:
+            Generator of Response object
+        """
+        
+        return grequests.imap( 
+                        (grequests.post(url = url, data = json.dumps(individ_data) ,headers = dict(self.header_content, **headers), verify = False, timeout=timeout_time) for individ_data in body_list), 
+                        size = pool_size, exception_handler=lambda request, exception: logging.error('   --Getting Multi POST response Failed with Timeout Exception [{} ] '.format(exception)))
+
+    def get_multi(self, url_list, headers={}, timeout_time=600, pool_size=1):
+        """
+        Used for parallel async GET request.
+        Args:
+            url_list (list): list of urls
+            headers (dict)[default:{'Content-Type': 'application/json'}]: if required
+            timeout_time(int)[default:600]: timeout required 
+            pool_size(int)[default:1]: number of parallel requests fired
+        Returns:
+            Generator of Response object
+        """
+
+        return grequests.imap( 
+                        (grequests.get(url = individ_url,headers = dict(self.header_content, **headers), verify = False, timeout=timeout_time) for individ_url in url_list), 
+                        size = pool_size, exception_handler=lambda request, exception: logging.error('   --Getting Multi GET response Failed with Timeout Exception [{} ]'.format(exception)))
+
 
 
 

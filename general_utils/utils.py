@@ -41,24 +41,30 @@ class RMQ:
         port (int): port as int
         user (str): user_name
         pwd (str): password
+        socket_timeout (float) [default:None]: socket connect timeout in seconds
+        stack_timeout (float) [default:None]: full protocol stack TCP/[SSL]/AMQP bring-up timeout in seconds
+        heartbeat [default:0] : AMQP connection heartbeat timeout value for negotiation during connection tuning or callable which is invoked during connection tuning
     Returns:
         None
     Methods:
         listen() : for consuming messages
         publish() : for sending mesages
     """
-    def __init__(self, host, port, user, pwd):
-        self.channel = self.set_connection(host, port, user, pwd)
+    def __init__(self, host, port, user, pwd, socket_timeout=None, stack_timeout=None, heartbeat=0):
+        self.channel = self.set_connection(host, port, user, pwd, socket_timeout, stack_timeout, heartbeat)
         self.cust_prop = pika.BasicProperties(
             delivery_mode=2,  # make message persistent
         )
 
-    def set_connection(self, host, port, user, pwd):
+    def set_connection(self, host, port, user, pwd, socket_timeout, stack_timeout, heartbeat):
         credentials = pika.PlainCredentials(user, pwd)
-        parameters = pika.ConnectionParameters(host,
-                                               port,
-                                               '/',
-                                               credentials)
+        parameters = pika.ConnectionParameters(host=host,
+                                               port=port,
+                                               virtual_host='/',
+                                               socket_timeout=socket_timeout,
+                                               stack_timeout=stack_timeout,
+                                               heartbeat=heartbeat,
+                                               credentials=credentials)
         connection = pika.BlockingConnection(parameters)
         
         logging.info('--- Connection build successfully ---')

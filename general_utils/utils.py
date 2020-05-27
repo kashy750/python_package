@@ -201,20 +201,24 @@ class FileStorage:
 
         return minioClient
 
-    def get_data(self, bucket_name, file_name, data_type="csv"):
+    def get_data(self, bucket_name, file_name, data_type="csv", index_col=None):
         """
         Used for fetching a file from MinIO from a specific bucket.
         Args:
             bucket_name (str): MinIO bucket name
             file_name (str): unique file name 
             data_type (str)[default:'csv']: type of data to read
+            index_col (int)[default:None]: column-index which is to be taken as the df-index 
         Returns:
             Data (df/dict)
         """
         data = self.minioClient.get_object(bucket_name, file_name)
 
         if data_type == "csv":
-            return pd.read_csv(data, index_col=0)
+            if index_col is None:
+                return pd.read_csv(data)
+            else:
+                return pd.read_csv(data, index_col=index_col)
         else:
             logging.error(" Wrong data_type requested: data_type='csv'")
             return {}

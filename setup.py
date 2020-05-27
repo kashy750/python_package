@@ -17,16 +17,10 @@ install_reqs = parse_requirements(requirements_path, session=False)
 
 reqs = [str(ir.req) for ir in install_reqs]
 
-# requirements = ["twine==1.13.0",
-#                 "pika==1.1.0",
-#                 "minio==5.0.10",
-#                 "redis==3.4.1",
-#                 "pandas==1.0.1",
-#                 "pyarrow==0.17.0"]
 
 setup(
     name="general_utils",
-    version="0.0.4.3",
+    version="0.1.1.1",
     author="Kashyap Madariyil",
     author_email="kashyapmadariyil@gmail.com",
     description="A general package that has useful functionalities",

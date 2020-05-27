@@ -214,7 +214,7 @@ class FileStorage:
         data = self.minioClient.get_object(bucket_name, file_name)
 
         if data_type == "csv":
-            return pd.read_csv(data)
+            return pd.read_csv(data, index_col=0)
         else:
             logging.error(" Wrong data_type requested: data_type='csv'")
             return {}

@@ -1,3 +1,16 @@
+"""
+A General Utilities Library that provides a Python interface to many technologies
+
+Available Objects:
+1. RMQ - RabbitMQ for queueing purpose
+2. REDIS - Redis as a secondary storage
+3. FileStorage - MinIO for storing and retrieving files
+4. APIrequest - for API requests
+
+Available Functions:
+1. logger - Logging purpose
+"""
+
 from gevent import monkey as curious_george
 curious_george.patch_all(thread=False, select=False)
 
@@ -180,9 +193,9 @@ class REDIS:
 
 class FileStorage:
     """
-    Used for interacting wiht Redis.
+    Used for interacting wiht MinIO.
     Args:
-        host (str): url for connection
+        url (str): url for connection
         user (str): user name
         pwd (str): password
     Returns:

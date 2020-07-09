@@ -14,6 +14,9 @@ Available Functions:
 from gevent import monkey as curious_george
 curious_george.patch_all(thread=False, select=False)
 
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 import logging
 from importlib import reload # https://stackoverflow.com/a/53553516
 import pika
@@ -80,17 +83,16 @@ class RMQ:
                                                credentials=credentials)
         connection = pika.BlockingConnection(parameters)
         
-        logging.info('--- Connection build successfully ---')
+        logging.info('[G-utils]--- Connection build successfully ---')
 
         return connection.channel()
 
     def callback(self, ch, method, properties, body):
-        logging.info(" Message recieved : {}".format(body))
+        logging.info("[G-utils]------------------ Message recieved : {}".format(body))
         redisId_dict = self.callback_func(body)
         if redisId_dict and self.publish_fl and self.publish_queue:
             self.publish(redisId_dict, self.publish_queue)
-        logging.info(" Done Processing")
-        logging.info(" XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX \n\n")
+        logging.info("[G-utils] Callback Terminated ============================================================================================= \n\n")
 
 
     def listen(self, consume_queue, callback_func, publish_fl=False, publish_queue=""):
@@ -114,7 +116,7 @@ class RMQ:
         self.channel.basic_consume(queue=consume_queue,
                                    auto_ack=True,
                                    on_message_callback=self.callback)
-        logging.info(' Waiting for messages...')
+        logging.info('[G-utils]------------------ Waiting for messages...')
         self.channel.start_consuming()
 
     def publish(self, msg_dict, publish_queue):
@@ -130,7 +132,8 @@ class RMQ:
                                    routing_key=publish_queue,
                                    properties=self.cust_prop,
                                    body=json.dumps(msg_dict))
-        logging.info(" Redis keys send to solver for optimization!!!")
+        logging.info("[G-utils]------------------ Message published in queue {}!!!".format(publish_queue))
+
 
 
 class REDIS:
@@ -144,6 +147,7 @@ class REDIS:
     Methods:
         get_data() : for fetching data corresponding to a redis-key
         set_data() : for insert data corresponding to a redis-key
+        check_key_exists() : for checking specific redis-key exists or not
     """
 
     def __init__(self, host, port):
@@ -169,7 +173,7 @@ class REDIS:
         elif data_type == "dict":
             return json.loads(self.redis_conn.get("{}".format(redis_key)))
         else:
-            logging.error(" Wrong data_type requested: data_type='df'/'dict'")
+            logging.error("[G-utils] Wrong data_type requested: data_type='df'/'dict'")
             return {}
 
     def set_data(self, redis_key, data, data_type="dict"):
@@ -177,7 +181,7 @@ class REDIS:
         Used for inserting data to Redis corresponding to a specific key.
         Args:
             redis_key (str): uniquu redis-key
-            redis_key (str): uniquu redis-key
+            data (dict/list/df): data to be stored in redis
             data_type (str)[default:'dict']: type of data stored with the redis-key (options:dict, df) 
         Returns:
             Data (df/dict)
@@ -187,8 +191,18 @@ class REDIS:
         elif data_type == "dict":
             return self.redis_conn.set("{}".format(redis_key), json.dumps(data))
         else:
-            logging.error(" Wrong data_type requested: data_type='df'/'dict'")
+            logging.error("[G-utils] Wrong data_type requested: data_type='df'/'dict'")
             return False
+
+    def check_key_exists(self, redis_key):
+        """
+        Used for checking if key exists in Redis db.
+        Args:
+            redis_key (str): unique redis-key
+        Returns:
+            Bool (bool): based on key exist  
+        """
+        return self.redis_conn.exists(redis_key)
 
 
 class FileStorage:
@@ -233,7 +247,7 @@ class FileStorage:
             else:
                 return pd.read_csv(data, index_col=index_col)
         else:
-            logging.error(" Wrong data_type requested: data_type='csv'")
+            logging.error("[G-utils] Wrong data_type requested: data_type='csv'")
             return {}
 
 
@@ -268,9 +282,9 @@ class APIrequest:
         try:
             return requests.post(url, json.dumps(body), headers=dict(self.header_content, **headers), verify = False, timeout=timeout_time)
         except requests.ConnectionError as e:
-            logging.error("   -API POST connection error[{}] ".format(e))
+            logging.error("[G-utils]   -API POST connection error[{}] ".format(e))
         except requests.Timeout as e:
-            logging.error("   -API POST timeout error[{}]".format(e))
+            logging.error("[G-utils]   -API POST timeout error[{}]".format(e))
 
         return
 
@@ -287,9 +301,9 @@ class APIrequest:
         try:
             return requests.get(url, headers=dict(self.header_content, **headers), verify = False, timeout=timeout_time)
         except requests.ConnectionError as e:
-            logging.error("   -API POST connection error[{}] ".format(e))
+            logging.error("[G-utils]   -API POST connection error[{}] ".format(e))
         except requests.Timeout as e:
-            logging.error("   -API POST timeout error[{}]".format(e))
+            logging.error("[G-utils]   -API POST timeout error[{}]".format(e))
 
         return
 
@@ -308,7 +322,7 @@ class APIrequest:
         
         return grequests.imap( 
                         (grequests.post(url = url, data = json.dumps(individ_data) ,headers = dict(self.header_content, **headers), verify = False, timeout=timeout_time) for individ_data in body_list), 
-                        size = pool_size, exception_handler=lambda request, exception: logging.error('   --Getting Multi POST response Failed with Timeout Exception [{} ] '.format(exception)))
+                        size = pool_size, exception_handler=lambda request, exception: logging.error('[G-utils]   --Getting Multi POST response Failed with Timeout Exception [{} ] '.format(exception)))
 
     def get_multi(self, url_list, headers={}, timeout_time=600, pool_size=1):
         """
@@ -324,7 +338,7 @@ class APIrequest:
 
         return grequests.imap( 
                         (grequests.get(url = individ_url,headers = dict(self.header_content, **headers), verify = False, timeout=timeout_time) for individ_url in url_list), 
-                        size = pool_size, exception_handler=lambda request, exception: logging.error('   --Getting Multi GET response Failed with Timeout Exception [{} ]'.format(exception)))
+                        size = pool_size, exception_handler=lambda request, exception: logging.error('[G-utils]   --Getting Multi GET response Failed with Timeout Exception [{} ]'.format(exception)))
 
 
 

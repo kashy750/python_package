@@ -11,11 +11,11 @@ Available Functions:
 1. logger - Logging purpose
 """
 
-from gevent import monkey as curious_george
-curious_george.patch_all(thread=False, select=False)
+# from gevent import monkey as curious_george
+# curious_george.patch_all(thread=False, select=False)
 
 import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore')
 
 import logging
 from importlib import reload # https://stackoverflow.com/a/53553516

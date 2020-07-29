@@ -30,17 +30,33 @@ import json
 
 
 
-def logger():
+def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs=""):
     """
     Used for logging in cmd line.
     Args:
-        None
+        level (logging-level)[defauolt: logging.INFO]: level of logging required
+        timeStamp_fl (bool)[default:True]: flag variable to mark timestamp in logs
+        processId_fl (bool)[default:False]: flag variable to mark processId in logs
+        extraLogs (str)[default:""]: extra string for logging
     Returns:
         None
     """
+    format_list = ['%(levelname)s']
+    if timeStamp_fl:
+        format_list.append('%(asctime)s')
+    if processId_fl:
+        format_list.append('%(process)d')
+    if extraLogs:
+        format_list.append(extraLogs)
+
+    
+    format_list.append(' : %(message)s')
+
+    # _format = '%(levelname)s: %(asctime)s %(process)d %(message)s '
+    _format = " ".join(format_list)
     reload(logging) # https://stackoverflow.com/a/53553516
-    logging.basicConfig(level=logging.INFO,
-                        format='%(levelname)s: %(asctime)s %(process)d %(message)s ',
+    logging.basicConfig(level=level,
+                        format="{}".format(_format),
                         datefmt='%d/%m/%Y %I:%M:%S %p'
                         # filename=constants.LOG_FILE_LOCATION, filemode='a')
                         )
@@ -146,22 +162,25 @@ class REDIS:
         None
     Methods:
         get_data() : for fetching data corresponding to a redis-key
+        get_hashData() : for fetching hashed data corresponding to a redis-key (entire hash/ value corresponding to a specific key)
         set_data() : for insert data corresponding to a redis-key
         check_key_exists() : for checking specific redis-key exists or not
     """
 
-    def __init__(self, host, port):
+    def __init__(self, host, port, decode_responses=True):
         self.context = pa.default_serialization_context()
-        self.redis_conn = self.set_connection(host, port)
+        self.redis_conn = self.set_connection(host, port, decode_responses)
 
-    def set_connection(self, host, port):
+    def set_connection(self, host, port, decode_responses):
         return redis.Redis(
-            host=host,
-            port=port)
+                host=host,
+                port=port,
+                decode_responses=decode_responses
+            )
 
     def get_data(self, redis_key, data_type="dict"):
         """
-        Used for fetching data from Redis corresponding to a specific key.
+        Used for fetching data from Redis corresponding to a specific key (using 'get' method).
         Args:
             redis_key (str): uniquu redis-key
             data_type (str)[default:'dict']: type of data stored with the redis-key (options:dict, df) 
@@ -176,13 +195,41 @@ class REDIS:
             logging.error("[G-utils] Wrong data_type requested: data_type='df'/'dict'")
             return {}
 
+    def get_hashData(self, redis_key, data_type="hash", hash_keys=""):
+        """
+        Used for fetching hashed data from Redis corresponding to a specific key.
+        Args:
+            redis_key (str): uniquu redis-key
+            data_type (str)[default:'hash'] {options: hash/hash-values}: type of data fetched Eg: entire hash OR corresponding to a key(sinlge/multiple) 
+            hash_keys(str/list): the key used in hash to fetch values
+        Returns:
+            Data (dict/string/list)
+        """
+        if data_type == "hash":
+            return self.redis_conn.hgetall(redis_key)
+        elif data_type == "hash-values":
+            if hash_keys:
+                if isinstance(hash_keys, str):
+                    return self.redis_conn.hget(redis_key, hash_keys)
+                elif isinstance(hash_keys, list):
+                    return self.redis_conn.hmget(redis_key, hash_keys)
+                else:
+                    logging.error("[G-utils] Hash keys should be of type list/str")
+                    return {}
+            else:
+                logging.error("[G-utils] Hash keys/key required of type list/str")
+                return {}
+        else:
+            logging.error("[G-utils] Wrong data_type requested: data_type='hash'/'hash-values'")
+            return {}
+
     def set_data(self, redis_key, data, data_type="dict"):
         """
         Used for inserting data to Redis corresponding to a specific key.
         Args:
             redis_key (str): uniquu redis-key
             data (dict/list/df): data to be stored in redis
-            data_type (str)[default:'dict']: type of data stored with the redis-key (options:dict, df) 
+            data_type (str)[default:'dict']: type of data stored with the redis-key (options:dict, df, hash_multi) 
         Returns:
             Data (df/dict)
         """
@@ -190,6 +237,8 @@ class REDIS:
             return self.redis_conn.set("{}".format(redis_key), self.context.serialize(data).to_buffer().to_pybytes())
         elif data_type == "dict":
             return self.redis_conn.set("{}".format(redis_key), json.dumps(data))
+        elif data_type == "hash_multi":
+            return self.redis_conn.hmset("{}".format(redis_key), data)
         else:
             logging.error("[G-utils] Wrong data_type requested: data_type='df'/'dict'")
             return False
@@ -261,6 +310,7 @@ class APIrequest:
     Methods:
         get() : for GET rqst
         post() : for POST rqst
+        put() : for PUT rqst
         get_multi() : for parallel GET rqst
         post_multi() : for parallel POST rqst
     """
@@ -268,14 +318,14 @@ class APIrequest:
     def __init__(self):
         self.header_content = {'Content-Type': 'application/json'}
 
-    def post(self, url, body, headers={}, timeout_time=600):
+    def post(self, url, body, headers={}, timeout_time=1800):
         """
         Used for POST request.
         Args:
             url (str): url
             body (dict): data dict  
             headers (dict)[default:{'Content-Type': 'application/json'}]: if required
-            timeout_time(int)[default:600]: timeout required 
+            timeout_time(int)[default:1800]: timeout required 
         Returns:
             Response object
         """
@@ -288,13 +338,13 @@ class APIrequest:
 
         return
 
-    def get(self, url, headers={}, timeout_time=600):
+    def get(self, url, headers={}, timeout_time=1800):
         """
         Used for GET request.
         Args:
             url (str): url
             headers (dict)[default:{'Content-Type': 'application/json'}]: if required
-            timeout_time(int)[default:600]: timeout required 
+            timeout_time(int)[default:1800]: timeout required 
         Returns:
             Response object
         """
@@ -307,14 +357,35 @@ class APIrequest:
 
         return
 
-    def post_multi(self, url, body_list, headers={}, timeout_time=600, pool_size=1):
+    def put(self, url, body, headers={}, timeout_time=1800):
+        """
+        Used for PUT request.
+        Args:
+            url (str): url
+            body (dict): data dict  
+            headers (dict)[default:{'Content-Type': 'application/json'}]: if required
+            timeout_time(int)[default:1800]: timeout required 
+        Returns:
+            Response object
+        """
+        try:
+            return requests.put(url, json.dumps(body), headers=dict(self.header_content, **headers), verify = False, timeout=timeout_time)
+        except requests.ConnectionError as e:
+            logging.error("[G-utils]   -API PUT connection error[{}] ".format(e))
+        except requests.Timeout as e:
+            logging.error("[G-utils]   -API PUT timeout error[{}]".format(e))
+
+        return
+
+
+    def post_multi(self, url, body_list, headers={}, timeout_time=1800, pool_size=1):
         """
         Used for parallel async POST request.
         Args:
             url (str): url
             body_list (list): list of data dicts  
             headers (dict)[default:{'Content-Type': 'application/json'}]: if required
-            timeout_time(int)[default:600]: timeout required 
+            timeout_time(int)[default:1800]: timeout required 
             pool_size(int)[default:1]: number of parallel requests fired
         Returns:
             Generator of Response object
@@ -324,13 +395,13 @@ class APIrequest:
                         (grequests.post(url = url, data = json.dumps(individ_data) ,headers = dict(self.header_content, **headers), verify = False, timeout=timeout_time) for individ_data in body_list), 
                         size = pool_size, exception_handler=lambda request, exception: logging.error('[G-utils]   --Getting Multi POST response Failed with Timeout Exception [{} ] '.format(exception)))
 
-    def get_multi(self, url_list, headers={}, timeout_time=600, pool_size=1):
+    def get_multi(self, url_list, headers={}, timeout_time=1800, pool_size=1):
         """
         Used for parallel async GET request.
         Args:
             url_list (list): list of urls
             headers (dict)[default:{'Content-Type': 'application/json'}]: if required
-            timeout_time(int)[default:600]: timeout required 
+            timeout_time(int)[default:1800]: timeout required 
             pool_size(int)[default:1]: number of parallel requests fired
         Returns:
             Generator of Response object

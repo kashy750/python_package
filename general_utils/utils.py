@@ -167,16 +167,21 @@ class REDIS:
         check_key_exists() : for checking specific redis-key exists or not
     """
 
-    def __init__(self, host, port, decode_responses=True):
+    def __init__(self, host, port, decode_responses=False):
         self.context = pa.default_serialization_context()
         self.redis_conn = self.set_connection(host, port, decode_responses)
 
     def set_connection(self, host, port, decode_responses):
-        return redis.Redis(
-                host=host,
-                port=port,
-                decode_responses=decode_responses
-            )
+        if decode_responses:
+            return redis.Redis(
+                    host=host,
+                    port=port,
+                    decode_responses=decode_responses
+                )
+        else:
+            return redis.Redis(
+                    host=host,
+                    port=port)
 
     def get_data(self, redis_key, data_type="dict"):
         """

@@ -269,7 +269,9 @@ class FileStorage:
     Returns:
         None
     Methods:
-        get_data() : for fetching data corresponding to a redis-key
+        get_data() : for fetching file corresponding to a folderName and fileName
+        putFile() : for inserting file corresponding to a folderName and fileName
+        get_folderLists() : fetch all File-names available in the given folder
     """
     def __init__(self, url, user, pwd):
         self.minioClient = self.set_connection(url, user, pwd)
@@ -300,6 +302,35 @@ class FileStorage:
                 return pd.read_csv(data)
             else:
                 return pd.read_csv(data, index_col=index_col)
+        else:
+            logging.error("[G-utils] Wrong data_type requested: data_type='csv'")
+            return {}
+
+    def get_folderLists(self):
+        """
+        Used for fetching all bucket-names from MinIO.
+        Args:
+            None 
+        Returns:
+            Generator of bucket-names with creation dates
+        """
+        buckets = self.minioClient.list_buckets()
+        for bucket in buckets:
+            yield bucket.__dict__
+            
+    def putFile(self, bucket_name, storeFile_name, file_path, data_type="csv"):
+        """
+        Used for fetching a file from MinIO from a specific bucket.
+        Args:
+            bucket_name (str): MinIO bucket name
+            storeFile_name (str): unique file name to be stored in MinIO
+            file_path (str): path of file stored in local 
+            data_type (str)[default:'csv']: type of data to read
+        Returns:
+            etag and version ID if available.
+        """
+        if data_type=="csv":
+            return self.minioClient.fput_object(bucket_name, storeFile_name, file_path, 'application/csv')
         else:
             logging.error("[G-utils] Wrong data_type requested: data_type='csv'")
             return {}

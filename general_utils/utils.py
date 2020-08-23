@@ -228,20 +228,21 @@ class REDIS:
             logging.error("[G-utils] Wrong data_type requested: data_type='hash'/'hash-values'")
             return {}
 
-    def set_data(self, redis_key, data, data_type="dict"):
+    def set_data(self, redis_key, data, data_type="dict", expiry=None):
         """
         Used for inserting data to Redis corresponding to a specific key.
         Args:
             redis_key (str): uniquu redis-key
             data (dict/list/df): data to be stored in redis
             data_type (str)[default:'dict']: type of data stored with the redis-key (options:dict, df, hash_multi) 
+            expiry (str)[default:None]: set key expiry in sec (default no expiry) 
         Returns:
             Data (df/dict)
         """
         if data_type == "df":
-            return self.redis_conn.set("{}".format(redis_key), self.context.serialize(data).to_buffer().to_pybytes())
+            return self.redis_conn.set("{}".format(redis_key), self.context.serialize(data).to_buffer().to_pybytes(), ex=expiry)
         elif data_type == "dict":
-            return self.redis_conn.set("{}".format(redis_key), json.dumps(data))
+            return self.redis_conn.set("{}".format(redis_key), json.dumps(data), ex=expiry)
         elif data_type == "hash_multi":
             return self.redis_conn.hmset("{}".format(redis_key), data)
         else:

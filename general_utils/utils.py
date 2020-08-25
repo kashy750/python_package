@@ -82,11 +82,29 @@ class RMQ:
         listen() : for consuming messages
         publish() : for sending mesages
     """
-    def __init__(self, host, port, user, pwd, socket_timeout=None, stack_timeout=None, heartbeat=0):
-        self.channel = self.set_connection(host, port, user, pwd, socket_timeout, stack_timeout, heartbeat)
+    def __init__(self, url="", host="", port="", user="", pwd="", socket_timeout=None, stack_timeout=None, heartbeat=0):
+
+        if url:
+            self.channel = self.set_connection_url(url, socket_timeout, stack_timeout, heartbeat)
+        else:
+            self.channel = self.set_connection(host, port, user, pwd, socket_timeout, stack_timeout, heartbeat)
+
         self.cust_prop = pika.BasicProperties(
             delivery_mode=2,  # make message persistent
         )
+
+    def set_connection_url(self, url, socket_timeout, stack_timeout, heartbeat):
+
+        parameters = pika.URLParameters(url)
+        parameters.socket_timeout = socket_timeout
+        parameters.stack_timeout = stack_timeout
+        parameters.heartbeat = heartbeat
+
+        connection = pika.BlockingConnection(parameters)
+        
+        logging.info('[G-utils]--- Connection build successfully [URL] ---')
+
+        return connection.channel()
 
     def set_connection(self, host, port, user, pwd, socket_timeout, stack_timeout, heartbeat):
         credentials = pika.PlainCredentials(user, pwd)
@@ -99,7 +117,7 @@ class RMQ:
                                                credentials=credentials)
         connection = pika.BlockingConnection(parameters)
         
-        logging.info('[G-utils]--- Connection build successfully ---')
+        logging.info('[G-utils]--- Connection build successfully [HOST-PORT]---')
 
         return connection.channel()
 
@@ -156,6 +174,7 @@ class REDIS:
     """
     Used for interacting wiht Redis.
     Args:
+        url (str) : connection url
         host (str): host for connection
         port (int): port as int
     Returns:
@@ -167,9 +186,15 @@ class REDIS:
         check_key_exists() : for checking specific redis-key exists or not
     """
 
-    def __init__(self, host, port, decode_responses=False):
+    def __init__(self, url="", host="", port="", decode_responses=False):
         self.context = pa.default_serialization_context()
-        self.redis_conn = self.set_connection(host, port, decode_responses)
+        if url:
+            self.redis_conn = self.set_connection_url(url)
+        else:
+            self.redis_conn = self.set_connection(host, port, decode_responses)
+
+    def set_connection_url(self, url):
+        return redis.Redis.from_url(url)
 
     def set_connection(self, host, port, decode_responses):
         if decode_responses:

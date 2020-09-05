@@ -189,12 +189,15 @@ class REDIS:
     def __init__(self, url="", host="", port="", decode_responses=False):
         self.context = pa.default_serialization_context()
         if url:
-            self.redis_conn = self.set_connection_url(url)
+            self.redis_conn = self.set_connection_url(url, decode_responses)
         else:
             self.redis_conn = self.set_connection(host, port, decode_responses)
 
-    def set_connection_url(self, url):
-        return redis.Redis.from_url(url)
+    def set_connection_url(self, url, decode_responses):
+        if decode_responses:
+            return redis.Redis.from_url(url, decode_responses)
+        else:
+            return redis.Redis.from_url(url)
 
     def set_connection(self, host, port, decode_responses):
         if decode_responses:

@@ -15,12 +15,15 @@ with open(readme_path, "r") as readme_file:
 # parse_requirements() returns generator of pip.req.InstallRequirement objects
 install_reqs = parse_requirements(requirements_path, session=False)
 
-reqs = [str(ir.req) for ir in install_reqs]
+# for each in install_reqs:
+#     print(each.__dict__)
+
+reqs = [str(ir.requirement) for ir in install_reqs]
 
 
 setup(
     name="general_utils",
-    version="0.1.9",
+    version="0.1.11",
     author="Kashyap Madariyil",
     author_email="kashyapmadariyil@gmail.com",
     description="A general package that has useful functionalities",

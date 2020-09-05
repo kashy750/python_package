@@ -177,6 +177,7 @@ class REDIS:
         url (str) : connection url
         host (str): host for connection
         port (int): port as int
+        decode_responses (bool): used to binary str decode of hash values
     Returns:
         None
     Methods:
@@ -195,7 +196,7 @@ class REDIS:
 
     def set_connection_url(self, url, decode_responses):
         if decode_responses:
-            return redis.Redis.from_url(url, decode_responses)
+            return redis.Redis.from_url(url, decode_responses=decode_responses)
         else:
             return redis.Redis.from_url(url)
 

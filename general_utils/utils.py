@@ -24,7 +24,9 @@ from minio import Minio
 import redis
 import pyarrow as pa
 import grequests, requests
-
+import functools
+import threading
+import uuid
 import pandas as pd
 import json
 
@@ -100,11 +102,11 @@ class RMQ:
         parameters.stack_timeout = stack_timeout
         parameters.heartbeat = heartbeat
 
-        connection = pika.BlockingConnection(parameters)
+        self.connection = pika.BlockingConnection(parameters)
         
         logging.info('[G-utils]--- Connection build successfully [URL] ---')
 
-        return connection.channel()
+        return self.connection.channel()
 
     def set_connection(self, host, port, user, pwd, socket_timeout, stack_timeout, heartbeat):
         credentials = pika.PlainCredentials(user, pwd)
@@ -115,43 +117,109 @@ class RMQ:
                                                stack_timeout=stack_timeout,
                                                heartbeat=heartbeat,
                                                credentials=credentials)
-        connection = pika.BlockingConnection(parameters)
+        self.connection = pika.BlockingConnection(parameters)
         
         logging.info('[G-utils]--- Connection build successfully [HOST-PORT]---')
 
-        return connection.channel()
+        return self.connection.channel()
+
+    
+    def ack_message(self, channel, delivery_tag, thread_cnt):
+        """Note that `channel` must be the same pika channel instance via which
+        the message being ACKed was retrieved (AMQP protocol constraint).
+        """
+        if channel.is_open:
+            channel.basic_ack(delivery_tag)
+            logging.info("[G-utils]--- Joining thread(index): {} from messageThreads and deleting from stack".format(thread_cnt))
+            self.messageThreads[thread_cnt].join()
+            self.messageThreads.pop(thread_cnt, None)
+            logging.info("[G-utils]--- Channel opened.. So message acknowledged")
+        else:
+            # Channel is already closed, so we can't ACK this message;
+            logging.error("[G-utils]--- Channel closed.. So message NOT acknowledged")
+
+    def do_work(self, connection, channel, delivery_tag, body, thread_cnt):
+        thread_id = threading.get_ident()
+        logging.info("[G-utils]--- Thread info= Thread id: {} Delivery tag: {}".format(thread_id, delivery_tag))
+        logging.info("[G-utils]--- Message body: {}".format(body))
+
+        # callback function initiated
+        self.callback_func(body)
+        
+        cb = functools.partial(self.ack_message, channel, delivery_tag, thread_cnt)
+        self.connection.add_callback_threadsafe(cb)
+
+    def on_message(self, channel, method_frame, header_frame, body, args):
+        (connection, threads) = args
+        delivery_tag = method_frame.delivery_tag
+        thread_key = str(uuid.uuid4())
+        t = threading.Thread(target=self.do_work, args=(connection, channel, delivery_tag, body, thread_key))
+        
+        self.messageThreads[thread_key] = t
+        logging.info("[G-utils]--- Threading fired with key: {}".format(thread_key))
+        t.start()
+
 
     def callback(self, ch, method, properties, body):
+        '''
+        NOT in use
+        '''
         logging.info("[G-utils]------------------ Message recieved : {}".format(body))
-        redisId_dict = self.callback_func(body)
-        if redisId_dict and self.publish_fl and self.publish_queue:
-            self.publish(redisId_dict, self.publish_queue)
+        self.callback_func(body)
         logging.info("[G-utils] Callback Terminated ============================================================================================= \n\n")
 
 
-    def listen(self, consume_queue, callback_func, publish_fl=False, publish_queue=""):
+    def listen(self, consume_queue, callback_func, prefetch_count=1):
         """
         Used for listening to messages (continuous).
         Args:
             consume_queue (str): queue_name to listen
             callback_func (function): pass a funtion which takes a str as input(the message recieved)
-            publish_fl (bool)[default:True]: 'True', if some message to publish after callback_func()
-            publish_queue (str)[default:""]: queue_name to publish
         Returns:
             None [continuously waits for messages, never terminate]
         """
         self.callback_func = callback_func
-        self.publish_fl = publish_fl
-        self.publish_queue = publish_queue
         # try:
         #     self.channel.queue_declare(queue=consume_queue)
         # except Exception as e:
         #     logging.warning(' Queue Declaration error: {}'.format(e))
+
+        self.channel.basic_qos(prefetch_count=prefetch_count)
+
+        self.messageThreads = {}
+        on_message_callback = functools.partial(self.on_message, args=(self.connection, self.messageThreads))
+
         self.channel.basic_consume(queue=consume_queue,
-                                   auto_ack=True,
-                                   on_message_callback=self.callback)
+                                #    auto_ack=True,
+                                   on_message_callback=on_message_callback)
         logging.info('[G-utils]------------------ Waiting for messages...')
-        self.channel.start_consuming()
+        
+        
+        try:
+            self.channel.start_consuming()
+        except KeyboardInterrupt:
+            logging.error("[G-utils]--- KeyboardInterrupt")
+            self.channel.stop_consuming()
+        except Exception as e:
+            logging.error("[G-utils]--- Channel closed with error : {}".format(e))
+            self.channel.stop_consuming()
+        except:
+            logging.error("[G-utils]--- Channel closed")
+            self.channel.stop_consuming()
+
+        # Wait for all to complete
+        total_unfinished_threads = len(self.messageThreads)
+        logging.info("[G-utils]--- Waiting for {} threads to complete".format(total_unfinished_threads))
+        for cnt, (key,thread) in enumerate(self.messageThreads.items()):
+            logging.info("[G-utils]---  Joining thread : {} and cnt:{}/{}".format(key, cnt+1, total_unfinished_threads))
+            thread.join()
+
+
+        try:
+            self.connection.close()
+            logging.info("[G-utils]--- Connection Closed")
+        except Exception as e:
+            logging.error("[G-utils]--- Connection closing failed with error:{}".format(e))
 
     def publish(self, msg_dict, publish_queue):
         """

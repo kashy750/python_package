@@ -29,6 +29,7 @@ import threading
 import uuid
 import pandas as pd
 import json
+import io
 
 
 
@@ -388,7 +389,7 @@ class FileStorage:
         Args:
             bucket_name (str): MinIO bucket name
             file_name (str): unique file name 
-            data_type (str)[default:'csv']: type of data to read
+            data_type (str)[default:'csv']: type of data to read (csv/xlsx)
             index_col (int)[default:None]: column-index which is to be taken as the df-index 
         Returns:
             Data (df/dict)
@@ -400,6 +401,11 @@ class FileStorage:
                 return pd.read_csv(data)
             else:
                 return pd.read_csv(data, index_col=index_col)
+        elif data_type == "xlsx":
+            if index_col is None:
+                return pd.read_excel(io.BytesIO(data.read()))
+            else:
+                return pd.read_excel(io.BytesIO(data.read()), index_col=index_col)
         else:
             logging.error("[G-utils] Wrong data_type requested: data_type='csv'")
             return {}
@@ -423,12 +429,24 @@ class FileStorage:
             bucket_name (str): MinIO bucket name
             storeFile_name (str): unique file name to be stored in MinIO
             file_path (str): path of file stored in local 
-            data_type (str)[default:'csv']: type of data to read
+            data_type (str)[default:'csv']: type of data to read(csv/xlsx)
         Returns:
             etag and version ID if available.
         """
         if data_type=="csv":
-            return self.minioClient.fput_object(bucket_name, storeFile_name, file_path, 'application/csv')
+            return self.minioClient.fput_object(
+                        bucket_name=bucket_name, 
+                        object_name=storeFile_name, 
+                        file_path=file_path, 
+                        content_type='application/csv'
+                    )
+        elif data_type=="xlsx":
+            return self.minioClient.fput_object(
+                        bucket_name=bucket_name, 
+                        object_name=storeFile_name, 
+                        file_path=file_path, 
+                        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    )
         else:
             logging.error("[G-utils] Wrong data_type requested: data_type='csv'")
             return {}

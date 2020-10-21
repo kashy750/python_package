@@ -424,7 +424,7 @@ class FileStorage:
             
     def putFile(self, bucket_name, storeFile_name, file_path, data_type="csv"):
         """
-        Used for fetching a file from MinIO from a specific bucket.
+        Used for inserting a file from local to a minio bucket.
         Args:
             bucket_name (str): MinIO bucket name
             storeFile_name (str): unique file name to be stored in MinIO
@@ -447,6 +447,46 @@ class FileStorage:
                         file_path=file_path, 
                         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
+        else:
+            logging.error("[G-utils] Wrong data_type requested: data_type='csv'")
+            return {}
+
+    def putObject(self, bucket_name, storeFile_name, data, data_type="csv"):
+        """
+        Used for inserting data(streaming) to MinIO.
+        Args:
+            bucket_name (str): MinIO bucket name
+            storeFile_name (str): unique file name to be stored in MinIO
+            data (df): df object of the data 
+            data_type (str)[default:'csv']: type of data to read (csv/xlsx)
+        Returns:
+            etag and version ID if available.
+        """
+        # print(len(data.getvalue()))  # check if error comes on size
+        # print(len(data.getbuffer()))
+
+        if data_type=="csv":
+            csv_bytes = data.to_csv(index=False).encode('utf-8')
+            csv_buffer = io.BytesIO(csv_bytes)
+            return self.minioClient.put_object(
+                        bucket_name, 
+                        storeFile_name, 
+                        csv_buffer, 
+                        len(csv_bytes),
+                        content_type='application/csv'
+                    )
+        elif data_type=="xlsx":
+            towrite = io.BytesIO()
+            data.to_excel(towrite, index=False)  # write to BytesIO buffer
+            towrite.seek(0)
+            return self.minioClient.put_object(
+                        bucket_name, 
+                        storeFile_name, 
+                        towrite, 
+                        len(towrite.getbuffer()),
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    )
+            
         else:
             logging.error("[G-utils] Wrong data_type requested: data_type='csv'")
             return {}

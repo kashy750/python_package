@@ -6,3 +6,4 @@ pyarrow>=0.17.0
 grequests>=0.6.0
 requests>=2.23.0
 openpyxl>=3.0.5
+azure-storage-blob>=12.5.0

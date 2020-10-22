@@ -19,17 +19,18 @@ warnings.simplefilter(action='ignore')
 
 import logging
 from importlib import reload # https://stackoverflow.com/a/53553516
+import grequests, requests
 import pika
 from minio import Minio
 import redis
 import pyarrow as pa
-import grequests, requests
 import functools
 import threading
 import uuid
 import pandas as pd
 import json
 import io
+from azure.storage.blob import BlobClient
 
 
 
@@ -487,6 +488,53 @@ class FileStorage:
                         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
             
+        else:
+            logging.error("[G-utils] Wrong data_type requested: data_type='csv'")
+            return {}
+
+
+class FileStorageAzure:
+    """
+    Used for interacting wiht Azure blob.
+    Args:
+        connectionStr (str): connectionStr for connection
+    Returns:
+        None
+    Methods:
+        get_data() : for fetching file corresponding to a folderName and fileName
+    """
+    def __init__(self, connectionStr):
+        self.connStr = connectionStr
+
+    def get_data(self, bucket_name, file_name, data_type="csv", index_col=None):
+        """
+        Used for fetching a file from Azure blob from a specific bucket.
+        Args:
+            bucket_name (str): Azure container name
+            file_name (str): unique file name 
+            data_type (str)[default:'csv']: type of data to read (csv/xlsx)
+            index_col (int)[default:None]: column-index which is to be taken as the df-index 
+        Returns:
+            Data (df/dict)
+        """
+
+        if data_type == "csv":
+            logging.error("[G-utils] Not available for this version")
+            return {}
+        elif data_type == "xlsx":
+
+            if index_col is None:
+                blob = BlobClient.from_connection_string(conn_str=str(self.connStr), container_name=bucket_name, blob_name=file_name)
+
+                with io.BytesIO() as f:
+                    blob_data = blob.download_blob()
+                    blob_data.readinto(f)
+                    df_read = pd.read_excel(f)
+
+                return df_read
+            else:
+                logging.error("[G-utils] Not available for this version")
+                return {}
         else:
             logging.error("[G-utils] Wrong data_type requested: data_type='csv'")
             return {}

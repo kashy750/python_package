@@ -32,9 +32,15 @@ import json
 import io
 from azure.storage.blob import BlobClient
 
+import sentry_sdk
+from sentry_sdk.integrations.logging import LoggingIntegration
 
+# All of this is already happening by default!
 
-def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs=""):
+sentry_logging = LoggingIntegration(level=logging.INFO,  event_level=logging.INFO )
+sentry_sdk.init(dsn="http://faa1bdcdcf684748b51a66dd21103ae9@139.59.68.30:9000/4",integrations=[sentry_logging])
+
+def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs="",sentry_fl=True):
     """
     Used for logging in cmd line.
     Args:
@@ -45,6 +51,10 @@ def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs=
     Returns:
         None
     """
+
+   # if sentry_fl:
+
+
     format_list = ['%(levelname)s']
     if timeStamp_fl:
         format_list.append('%(asctime)s')
@@ -64,6 +74,8 @@ def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs=
                         datefmt='%d/%m/%Y %I:%M:%S %p'
                         # filename=constants.LOG_FILE_LOCATION, filemode='a')
                         )
+
+    
     return logging
 
 

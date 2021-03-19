@@ -32,30 +32,33 @@ import json
 import io
 from azure.storage.blob import BlobClient
 
-import os
-from dotenv import load_dotenv
-dirname = os.path.dirname(__file__)
-load_dotenv()
-
 import sentry_sdk
 from sentry_sdk.integrations.logging import LoggingIntegration
 
-def sentry_log():
-    # All of this is already happening by default!
+def sentry_log(level=logging.INFO, event_level=logging.ERROR, url=""):
+    """
+    Used for logging errors and exceptions in sentry sdk.
+    Args:
+        level (logging-level)[default: logging.INFO]: level of logging required
+        event_level (logging-level)[default: logging.ERROR]: event level of logging required
+        url (str)[default:""]: connection url
+    Returns:
+        None
+    """
     sentry_logging = LoggingIntegration(
-        level=logging.INFO,        # Capture info and above as breadcrumbs
-        event_level=logging.ERROR  # Send errors as events
+        level=level,        # Capture info and above as breadcrumbs
+        event_level=event_level  # Send errors as events
     )
     sentry_sdk.init(
-        dsn=os.environ['SENTRY_URL'],
+        dsn=url,
         integrations=[sentry_logging]
     )
 
-def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs="", sen_f=False):
+def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs="", sentry_flag=False, sentry_url=""):
     """
     Used for logging in cmd line.
     Args:
-        level (logging-level)[defauolt: logging.INFO]: level of logging required
+        level (logging-level)[default: logging.INFO]: level of logging required
         timeStamp_fl (bool)[default:True]: flag variable to mark timestamp in logs
         processId_fl (bool)[default:False]: flag variable to mark processId in logs
         extraLogs (str)[default:""]: extra string for logging
@@ -84,8 +87,11 @@ def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs=
                         # filename=constants.LOG_FILE_LOCATION, filemode='a')
                         )
 
-    if sen_f == True:
-        sentry_log()
+    if sentry_flag:
+        try:
+            sentry_log(url=sentry_url)
+        except Exception as e:
+            logging.error("[G-utils]--- Sentry Connection Unsuccessful")
 
     return logging
 

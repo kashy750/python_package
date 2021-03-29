@@ -62,6 +62,8 @@ def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs=
         timeStamp_fl (bool)[default:True]: flag variable to mark timestamp in logs
         processId_fl (bool)[default:False]: flag variable to mark processId in logs
         extraLogs (str)[default:""]: extra string for logging
+        sentry_flag (bool)[default:False]: flag variable to connect sentry logs
+        sentry_url (str)[default:""]: connection url
     Returns:
         None
     """
@@ -90,6 +92,7 @@ def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs=
     if sentry_flag:
         try:
             sentry_log(url=sentry_url)
+            '[G-utils]--- Sentry Connection build successfully [URL] ---'
         except Exception as e:
             logging.error("[G-utils]--- Sentry Connection Unsuccessful")
 

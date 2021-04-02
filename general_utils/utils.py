@@ -32,19 +32,43 @@ import json
 import io
 from azure.storage.blob import BlobClient
 
+import sentry_sdk
+from sentry_sdk.integrations.logging import LoggingIntegration
 
-
-def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs=""):
+def sentry_log(level=logging.INFO, event_level=logging.ERROR, url=""):
     """
-    Used for logging in cmd line.
+    Used for logging errors and exceptions in sentry sdk.
     Args:
-        level (logging-level)[defauolt: logging.INFO]: level of logging required
-        timeStamp_fl (bool)[default:True]: flag variable to mark timestamp in logs
-        processId_fl (bool)[default:False]: flag variable to mark processId in logs
-        extraLogs (str)[default:""]: extra string for logging
+        level (logging-level)[default: logging.INFO]: level of logging required
+        event_level (logging-level)[default: logging.ERROR]: event level of logging required
+        url (str)[default:""]: connection url
     Returns:
         None
     """
+    sentry_logging = LoggingIntegration(
+        level=level,        # Capture info and above as breadcrumbs
+        event_level=event_level  # Send errors as events
+    )
+    sentry_sdk.init(
+        dsn=url,
+        integrations=[sentry_logging]
+    )
+
+def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs="", sentry_flag=False, sentry_url=""):
+    """
+    Used for logging in cmd line.
+    Args:
+        level (logging-level)[default: logging.INFO]: level of logging required
+        timeStamp_fl (bool)[default:True]: flag variable to mark timestamp in logs
+        processId_fl (bool)[default:False]: flag variable to mark processId in logs
+        extraLogs (str)[default:""]: extra string for logging
+        sentry_flag (bool)[default:False]: flag variable to connect sentry logs
+        sentry_url (str)[default:""]: connection url
+    Returns:
+        None
+    """
+
+
     format_list = ['%(levelname)s']
     if timeStamp_fl:
         format_list.append('%(asctime)s')
@@ -64,6 +88,14 @@ def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs=
                         datefmt='%d/%m/%Y %I:%M:%S %p'
                         # filename=constants.LOG_FILE_LOCATION, filemode='a')
                         )
+
+    if sentry_flag:
+        try:
+            sentry_log(url=sentry_url)
+            logging.info('[G-utils]--- Sentry Connection build successfully [URL] ---')
+        except Exception as e:
+            logging.error("[G-utils]--- Sentry Connection Unsuccessful: {}".format(e))
+
     return logging
 
 

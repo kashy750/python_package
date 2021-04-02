@@ -92,9 +92,9 @@ def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs=
     if sentry_flag:
         try:
             sentry_log(url=sentry_url)
-            '[G-utils]--- Sentry Connection build successfully [URL] ---'
+            logging.info('[G-utils]--- Sentry Connection build successfully [URL] ---')
         except Exception as e:
-            logging.error("[G-utils]--- Sentry Connection Unsuccessful")
+            logging.error("[G-utils]--- Sentry Connection Unsuccessful: {}".format(e))
 
     return logging
 

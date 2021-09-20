@@ -1,0 +1,23 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pika = ">=1.1.0"
+minio = ">=5.0.10"
+redis = ">=3.4.1"
+pandas = ">=1.0.1"
+pyarrow = ">=0.17.0"
+grequests = ">=0.6.0"
+requests = ">=2.23.0"
+openpyxl = ">=3.0.5"
+azure-storage-blob = ">=12.5.0"
+sentry-sdk = ">=1.0.0"
+psycopg2 = "*"
+
+[dev-packages]
+pylint = "*"
+
+[requires]
+python_version = "3.8"

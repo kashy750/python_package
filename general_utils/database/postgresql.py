@@ -1,4 +1,5 @@
 import psycopg2
+from pgcopy import CopyManager
 
 
 def get_connection(db_url):
@@ -6,9 +7,9 @@ def get_connection(db_url):
     return connection
 
 
-def execute_query(db_connection, query=""):
+def execute_query(db_connection, query, data):
     cursor = db_connection.cursor()
-    cursor.execute(query)
+    cursor.execute(query, data)
     db_connection.commit()
     cursor.close()
 
@@ -23,24 +24,22 @@ def insert_rows(db_connection, table_name, rows):
     """
     cursor = db_connection.cursor()
 
-    first_row = rows
-    column_names = first_row.keys()
-    column_names_sub_query = ', '.join(column_names)
+    first_row = rows[0]
+    column_names = list(first_row)
 
-    for row in rows:
-        try:
-            values = row.values()
-            row_values_sub_query = ', '.join(values)
-            insert_statement = f'INSERT INTO {table_name} ({column_names_sub_query}) VALUES ({row_values_sub_query});'
-            cursor.execute(insert_statement)
+    values = list(map(lambda row: tuple(row.values()), rows))
 
-        except (Exception, psycopg2.Error) as error:
-            print(error)
+    try:
+        copyManager = CopyManager(db_connection, table_name, column_names)
+        copyManager.copy(values)
+        db_connection.commit()
+        cursor.close()
 
-    db_connection.commit()
+    except (Exception, psycopg2.Error) as error:
+        cursor.close()
+        raise error
 
 
-# FIXME: Finish implementation
 def fetch_many(db_connection, table_name):
 
     query = f'SELECT * FROM {table_name}'
@@ -50,3 +49,10 @@ def fetch_many(db_connection, table_name):
     cursor.close()
 
     return result
+
+
+def is_connection_open(db_connection):
+    if db_connection.closed != 0:
+        return True
+
+    return False

@@ -23,7 +23,7 @@ reqs = [str(ir.requirement) for ir in install_reqs]
 
 setup(
     name="general_utils",
-    version="0.1.16",
+    version="0.2.1",
     author="Kashyap Madariyil",
     author_email="kashyapmadariyil@gmail.com",
     description="A general package that has useful functionalities",

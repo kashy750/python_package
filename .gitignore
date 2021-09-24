@@ -1,2 +1,5 @@
 general_utils/__pycache__/
 general_utils/*.py[cod]
+general_utils.egg-info
+build
+dist

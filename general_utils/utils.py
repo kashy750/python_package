@@ -44,10 +44,12 @@ def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs=
     """
     Used for logging in cmd line.
     Args:
-        level (logging-level)[defauolt: logging.INFO]: level of logging required
+        level (logging-level)[default: logging.INFO]: level of logging required
         timeStamp_fl (bool)[default:True]: flag variable to mark timestamp in logs
         processId_fl (bool)[default:False]: flag variable to mark processId in logs
         extraLogs (str)[default:""]: extra string for logging
+        sentry_flag (bool)[default:False]: flag variable to connect sentry logs
+        sentry_url (str)[default:""]: connection url
     Returns:
         None
     """

@@ -35,26 +35,12 @@ from azure.storage.blob import BlobClient
 import sentry_sdk
 from sentry_sdk.integrations.logging import LoggingIntegration
 
-def sentry_log(level=logging.INFO, event_level=logging.ERROR, url=""):
-    """
-    Used for logging errors and exceptions in sentry sdk.
-    Args:
-        level (logging-level)[default: logging.INFO]: level of logging required
-        event_level (logging-level)[default: logging.ERROR]: event level of logging required
-        url (str)[default:""]: connection url
-    Returns:
-        None
-    """
-    sentry_logging = LoggingIntegration(
-        level=level,        # Capture info and above as breadcrumbs
-        event_level=event_level  # Send errors as events
-    )
-    sentry_sdk.init(
-        dsn=url,
-        integrations=[sentry_logging]
-    )
+# All of this is already happening by default!
 
-def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs="", sentry_flag=False, sentry_url=""):
+sentry_logging = LoggingIntegration(level=logging.INFO,  event_level=logging.INFO )
+sentry_sdk.init(dsn="http://faa1bdcdcf684748b51a66dd21103ae9@139.59.68.30:9000/4",integrations=[sentry_logging])
+
+def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs="",sentry_fl=True):
     """
     Used for logging in cmd line.
     Args:
@@ -67,6 +53,8 @@ def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs=
     Returns:
         None
     """
+
+   # if sentry_fl:
 
 
     format_list = ['%(levelname)s']
@@ -89,13 +77,7 @@ def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs=
                         # filename=constants.LOG_FILE_LOCATION, filemode='a')
                         )
 
-    if sentry_flag:
-        try:
-            sentry_log(url=sentry_url)
-            logging.info('[G-utils]--- Sentry Connection build successfully [URL] ---')
-        except Exception as e:
-            logging.error("[G-utils]--- Sentry Connection Unsuccessful: {}".format(e))
-
+    
     return logging
 
 

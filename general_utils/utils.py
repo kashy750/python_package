@@ -5,10 +5,16 @@ Available Objects:
 1. RMQ - RabbitMQ for queueing purpose
 2. REDIS - Redis as a secondary storage
 3. FileStorage - MinIO for storing and retrieving files
-4. APIrequest - for API requests
+4. FileStorageAzure - Azure Blob Storage for retrieving files
+5. APIrequest - for API requests
 
 Available Functions:
 1. logger - Logging purpose
+2. sentry_log - Forward log records to Sentry
+
+Sentry is opt-in. Importing this module does not send anything anywhere. To
+forward logs to Sentry, call logger(sentry_flag=True) and supply a DSN either
+via the sentry_url argument or the SENTRY_URL environment variable.
 """
 
 # from gevent import monkey as curious_george
@@ -32,15 +38,41 @@ import json
 import io
 from azure.storage.blob import BlobClient
 
+import os
 import sentry_sdk
 from sentry_sdk.integrations.logging import LoggingIntegration
 
-# All of this is already happening by default!
+SENTRY_URL_ENV = "SENTRY_URL"
 
-sentry_logging = LoggingIntegration(level=logging.INFO,  event_level=logging.INFO )
-sentry_sdk.init(dsn="http://faa1bdcdcf684748b51a66dd21103ae9@139.59.68.30:9000/4",integrations=[sentry_logging])
 
-def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs="",sentry_fl=True):
+def sentry_log(level=logging.INFO, event_level=logging.ERROR, url=""):
+    """
+    Used for logging errors and exceptions in sentry sdk.
+    Args:
+        level (logging-level)[default: logging.INFO]: level of logging required
+        event_level (logging-level)[default: logging.ERROR]: event level of logging required
+        url (str)[default:""]: connection url. Falls back to the SENTRY_URL
+            environment variable when empty.
+    Returns:
+        bool: True if Sentry was initialised, False if no DSN was found
+    """
+    dsn = url or os.environ.get(SENTRY_URL_ENV, "")
+    if not dsn:
+        logging.warning("[G-utils]--- Sentry skipped: no DSN given and {} not set".format(SENTRY_URL_ENV))
+        return False
+
+    sentry_logging = LoggingIntegration(
+        level=level,        # Capture info and above as breadcrumbs
+        event_level=event_level  # Send errors as events
+    )
+    sentry_sdk.init(
+        dsn=dsn,
+        integrations=[sentry_logging]
+    )
+    return True
+
+
+def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs="", sentry_flag=False, sentry_url=""):
     """
     Used for logging in cmd line.
     Args:
@@ -49,13 +81,13 @@ def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs=
         processId_fl (bool)[default:False]: flag variable to mark processId in logs
         extraLogs (str)[default:""]: extra string for logging
         sentry_flag (bool)[default:False]: flag variable to connect sentry logs
-        sentry_url (str)[default:""]: connection url
+        sentry_url (str)[default:""]: connection url. Only used when
+            sentry_flag is True. Falls back to the SENTRY_URL environment
+            variable when empty; if neither is set, Sentry is skipped and local
+            logging continues.
     Returns:
-        None
+        logging: the configured logging module
     """
-
-   # if sentry_fl:
-
 
     format_list = ['%(levelname)s']
     if timeStamp_fl:
@@ -77,7 +109,14 @@ def logger(level=logging.INFO, timeStamp_fl=True, processId_fl=False, extraLogs=
                         # filename=constants.LOG_FILE_LOCATION, filemode='a')
                         )
 
-    
+    # after reload(logging), so the integration patches the live logging module
+    if sentry_flag:
+        try:
+            if sentry_log(url=sentry_url):
+                logging.info('[G-utils]--- Sentry Connection build successfully [URL] ---')
+        except Exception as e:
+            logging.error("[G-utils]--- Sentry Connection Unsuccessful: {}".format(e))
+
     return logging
 
 
@@ -385,6 +424,7 @@ class FileStorage:
     Methods:
         get_data() : for fetching file corresponding to a folderName and fileName
         putFile() : for inserting file corresponding to a folderName and fileName
+        putObject() : for inserting an in-memory object as a file
         get_folderLists() : fetch all File-names available in the given folder
     """
     def __init__(self, url, user, pwd):

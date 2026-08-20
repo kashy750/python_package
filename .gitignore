@@ -1,2 +1,14 @@
 general_utils/__pycache__/
 general_utils/*.py[cod]
+
+# build artefacts
+build/
+dist/
+*.egg-info/
+
+# local secrets
+.env
+*.env
+general_utils/.env
+
+.DS_Store
